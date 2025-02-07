@@ -1,8 +1,9 @@
 import { Solana } from '../../chains/solana/solana';
 import { PublicKey } from '@solana/web3.js';
 import { KaminoConfig } from './kamino.config';
-import type { ReservesInfo } from './kamino.interfaces';
+import type { ReserveInfo, ReservesInfo } from './kamino.interfaces';
 import { getMarket } from './kamino.utils';
+import { httpNotFound } from '../../services/error-handler';
 import { logger } from '../../services/logger';
 
 export class Kamino {
@@ -66,11 +67,62 @@ export class Kamino {
   }
 
   /** Get Kamino market reserves */
+  async getReserve(marketAddressOrName: string, tokenAddressOrSymbol: string): Promise<ReserveInfo> {
+    try {
+      const marketPubkey = this.kaminoMarketAddress(marketAddressOrName);
+      if (!marketPubkey) {
+        throw httpNotFound(`Market not found: ${marketAddressOrName}`);
+      }
+      const tokenPubKey = await this.solana.getToken(tokenAddressOrSymbol);
+      if (!tokenPubKey) {
+        throw httpNotFound(`Token not found: ${tokenAddressOrSymbol}`);
+      }
+
+      const connection = this.solana.connection;
+      const market = await getMarket({
+        connection,
+        marketPubkey,
+      });
+
+      const reserve = market.getReserveByMint(new PublicKey(tokenPubKey.address));
+      if (!reserve) {
+        throw httpNotFound(`Reserve not found: ${tokenAddressOrSymbol}`);
+      }
+
+      const currentSlot = await connection.getSlot();
+
+      const tokenSymbol =  reserve.getTokenSymbol();
+      const liquidityAvailable = reserve.getLiquidityAvailableAmount().toNumber();
+      const utlizationRatio = reserve.calculateUtilizationRatio();
+      const { totalBorrow, totalSupply } = reserve.getEstimatedDebtAndSupply(currentSlot, 0);
+      const totalSupplied = totalSupply.toNumber();
+      const totalSupplyAPY = reserve.totalSupplyAPY(currentSlot);
+      const totalBorrowed = totalBorrow.toNumber();
+      const totalBorrowAPY = reserve.totalBorrowAPY(currentSlot);
+      const borrowFactor = reserve.getBorrowFactor().toNumber();
+
+      return {
+        tokenSymbol,
+        liquidityAvailable,
+        utlizationRatio,
+        totalSupplied,
+        totalSupplyAPY,
+        totalBorrowed,
+        totalBorrowAPY,
+        borrowFactor,
+      };
+    } catch (error) {
+      logger.error('Failed to get Kamino reserves:', error);
+      throw error;
+    }
+  }
+
+  /** Get Kamino market reserves */
   async getReserves(marketAddressOrName: string): Promise<ReservesInfo> {
     try {
       const marketPubkey = this.kaminoMarketAddress(marketAddressOrName);
       if (!marketPubkey) {
-        throw new Error(`Market not found: ${marketAddressOrName}`);
+        throw httpNotFound(`Market not found: ${marketAddressOrName}`);
       }
       const connection = this.solana.connection;
       const market = await getMarket({
