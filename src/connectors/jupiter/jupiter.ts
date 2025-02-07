@@ -163,20 +163,20 @@ export class Jupiter {
       },
     );
     
-    console.log('[JUPITER] Simulation Result:', {
-      logs: simulatedTransactionResponse.logs,
-      unitsConsumed: simulatedTransactionResponse.unitsConsumed,
-      status: simulatedTransactionResponse.err ? 'FAILED' : 'SUCCESS'
-    });
+    // console.log('Simulation Result:', {
+    //   logs: simulatedTransactionResponse.logs,
+    //   unitsConsumed: simulatedTransactionResponse.unitsConsumed,
+    //   status: simulatedTransactionResponse.err ? 'FAILED' : 'SUCCESS'
+    // });
 
     if (simulatedTransactionResponse.err) {
       const logs = simulatedTransactionResponse.logs || [];
-      console.log('Simulation Error Details:', {
-        error: simulatedTransactionResponse.err,
-        programLogs: logs,
-        accounts: simulatedTransactionResponse.accounts,
-        unitsConsumed: simulatedTransactionResponse.unitsConsumed,
-      });
+      // console.log('Simulation Error Details:', {
+      //   error: simulatedTransactionResponse.err,
+      //   programLogs: logs,
+      //   accounts: simulatedTransactionResponse.accounts,
+      //   unitsConsumed: simulatedTransactionResponse.unitsConsumed,
+      // });
 
       const errorMessage = `${SIMULATION_ERROR_MESSAGE}\nError: ${JSON.stringify(simulatedTransactionResponse.err)}\nProgram Logs: ${logs.join('\n')}`;
       
