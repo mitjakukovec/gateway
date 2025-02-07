@@ -20,6 +20,10 @@ configurations:
     configurationPath: jupiter.yml
     schemaPath: jupiter-schema.json
 
+  $namespace kamino:
+    configurationPath: kamino.yml
+    schemaPath: kamino-schema.json
+
   $namespace meteora:
     configurationPath: meteora.yml
     schemaPath: meteora-schema.json

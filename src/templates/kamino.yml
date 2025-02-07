@@ -1,0 +1,11 @@
+programIds:
+  mainnet-beta:
+    KLEND: 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD'
+
+marketAddresses:
+  mainnet-beta:
+    JITO: 'H6rHXmXoCQvq8Ue81MqNh7ow5ysPa1dSozwW3PU1dDH6'
+    JLP: 'DxXdAyU3kCjnyggvHmY5nAwg5cRbbmdyX3npfDMjjMek'
+    MAIN: '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF'
+    ALTCOINS: 'ByYiZxp8QrdN9qbdtaAiePN8AAr3qvTPppNJDpf5DVJ5'
+    ETHENA: 'BJnbcRHqvppTyGesLzWASGKnmnF1wq9jZu6ExrjT7wvF'

@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "programIds": {
+      "type": "object",
+      "patternProperties": {
+        "[\\w-]+$": {
+          "type": "object",
+          "properties": {
+            "KLEND": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "KLEND"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "marketAddresses": {
+      "type": "object",
+      "patternProperties": {
+        "[\\w-]+$": {
+          "type": "object",
+          "properties": {
+            "JITO": {
+              "type": "string"
+            },
+            "JLP": {
+              "type": "string"
+            },
+            "MAIN": {
+              "type": "string"
+            },
+            "ALTCOINS": {
+              "type": "string"
+            },
+            "ETHENA": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "JITO",
+            "JLP",
+            "MAIN",
+            "ALTCOINS",
+            "ETHENA"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "programIds",
+    "marketAddresses"
+  ]
+}

@@ -3,6 +3,7 @@ import { Solana } from '../chains/solana/solana';
 import { Uniswap } from '../connectors/uniswap/uniswap';
 import { Jupiter } from '../connectors/jupiter/jupiter';
 import { Meteora } from '../connectors/meteora/meteora';
+import { Kamino } from '../connectors/kamino/kamino';
 
 
 export interface Chain {
@@ -68,6 +69,8 @@ export async function getConnector(
     return await Jupiter.getInstance(network);
   } else if (connector === 'meteora') {
     return await Meteora.getInstance(network);
+  } else if (connector === 'kamino') {
+    return await Kamino.getInstance(network);
   } else {
     throw new Error('unsupported chain or connector');
   }
