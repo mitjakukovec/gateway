@@ -1,8 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import type {
-  ReservesInfoRequest,
-  ReservesInfo,
-} from '../kamino.interfaces';
+import type { ReservesInfoRequest, ReservesInfo } from '../kamino.interfaces';
 import {
   ReservesInfoRequestSchema,
   ReservesInfoReplySchema,
@@ -22,10 +19,7 @@ export const reservesInfoRoute: FastifyPluginAsync = async (fastify) => {
         ...ReservesInfoRequestSchema,
         properties: {
           network: { type: 'string', examples: ['mainnet-beta'] },
-          market: {
-            type: 'string',
-            examples: ['MAIN'],
-          },
+          market: { type: 'string', examples: ['MAIN'] },
         },
       },
       response: {
@@ -38,7 +32,7 @@ export const reservesInfoRoute: FastifyPluginAsync = async (fastify) => {
         const network = request.query.network || 'mainnet-beta';
 
         const kamino = await Kamino.getInstance(network);
-        const reserves = await kamino.getReserves(market);
+        const reserves = await kamino.getReserves(market.toUpperCase());
 
         return reserves;
       } catch (e) {

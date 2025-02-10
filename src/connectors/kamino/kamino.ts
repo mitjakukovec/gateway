@@ -1,8 +1,13 @@
 import { Solana } from '../../chains/solana/solana';
 import { PublicKey } from '@solana/web3.js';
 import { KaminoConfig } from './kamino.config';
-import type { ReserveInfo, ReservesInfo } from './kamino.interfaces';
+import type {
+  ReserveInfo,
+  ReservesInfo,
+  ObligationInfo,
+} from './kamino.interfaces';
 import { getMarket } from './kamino.utils';
+import { VanillaObligation } from '@kamino-finance/klend-sdk';
 import { httpNotFound } from '../../services/error-handler';
 import { logger } from '../../services/logger';
 
@@ -67,14 +72,17 @@ export class Kamino {
   }
 
   /** Get Kamino market reserves */
-  async getReserve(marketAddressOrName: string, tokenAddressOrSymbol: string): Promise<ReserveInfo> {
+  async getReserve(
+    marketAddressOrName: string,
+    tokenAddressOrSymbol: string,
+  ): Promise<ReserveInfo> {
     try {
       const marketPubkey = this.kaminoMarketAddress(marketAddressOrName);
       if (!marketPubkey) {
         throw httpNotFound(`Market not found: ${marketAddressOrName}`);
       }
-      const tokenPubKey = await this.solana.getToken(tokenAddressOrSymbol);
-      if (!tokenPubKey) {
+      const tokenPubkey = await this.solana.getToken(tokenAddressOrSymbol);
+      if (!tokenPubkey) {
         throw httpNotFound(`Token not found: ${tokenAddressOrSymbol}`);
       }
 
@@ -84,17 +92,25 @@ export class Kamino {
         marketPubkey,
       });
 
-      const reserve = market.getReserveByMint(new PublicKey(tokenPubKey.address));
+      const reserve = market.getReserveByMint(
+        new PublicKey(tokenPubkey.address),
+      );
       if (!reserve) {
         throw httpNotFound(`Reserve not found: ${tokenAddressOrSymbol}`);
       }
 
       const currentSlot = await connection.getSlot();
 
-      const tokenSymbol =  reserve.getTokenSymbol();
-      const liquidityAvailable = reserve.getLiquidityAvailableAmount().toNumber();
+      const reserveAddress = reserve.address.toBase58();
+      const tokenSymbol = reserve.getTokenSymbol();
+      const liquidityAvailable = reserve
+        .getLiquidityAvailableAmount()
+        .toNumber();
       const utlizationRatio = reserve.calculateUtilizationRatio();
-      const { totalBorrow, totalSupply } = reserve.getEstimatedDebtAndSupply(currentSlot, 0);
+      const { totalBorrow, totalSupply } = reserve.getEstimatedDebtAndSupply(
+        currentSlot,
+        0,
+      );
       const totalSupplied = totalSupply.toNumber();
       const totalSupplyAPY = reserve.totalSupplyAPY(currentSlot);
       const totalBorrowed = totalBorrow.toNumber();
@@ -102,6 +118,7 @@ export class Kamino {
       const borrowFactor = reserve.getBorrowFactor().toNumber();
 
       return {
+        reserveAddress,
         tokenSymbol,
         liquidityAvailable,
         utlizationRatio,
@@ -112,7 +129,7 @@ export class Kamino {
         borrowFactor,
       };
     } catch (error) {
-      logger.error('Failed to get Kamino reserves:', error);
+      logger.error('Failed to get Kamino reserve:', error);
       throw error;
     }
   }
@@ -137,10 +154,16 @@ export class Kamino {
       const currentSlot = await connection.getSlot();
 
       return reserves.map((reserve) => {
-        const tokenSymbol =  reserve.getTokenSymbol();
-        const liquidityAvailable = reserve.getLiquidityAvailableAmount().toNumber();
+        const reserveAddress = reserve.address.toBase58();
+        const tokenSymbol = reserve.getTokenSymbol();
+        const liquidityAvailable = reserve
+          .getLiquidityAvailableAmount()
+          .toNumber();
         const utlizationRatio = reserve.calculateUtilizationRatio();
-        const { totalBorrow, totalSupply } = reserve.getEstimatedDebtAndSupply(currentSlot, 0);
+        const { totalBorrow, totalSupply } = reserve.getEstimatedDebtAndSupply(
+          currentSlot,
+          0,
+        );
         const totalSupplied = totalSupply.toNumber();
         const totalSupplyAPY = reserve.totalSupplyAPY(currentSlot);
         const totalBorrowed = totalBorrow.toNumber();
@@ -148,6 +171,7 @@ export class Kamino {
         const borrowFactor = reserve.getBorrowFactor().toNumber();
 
         return {
+          reserveAddress,
           tokenSymbol,
           liquidityAvailable,
           utlizationRatio,
@@ -160,6 +184,100 @@ export class Kamino {
       });
     } catch (error) {
       logger.error('Failed to get Kamino reserves:', error);
+      throw error;
+    }
+  }
+
+  /** Get Kamino obligation by wallet address */
+  async getObligation(
+    marketAddressOrName: string,
+    walletAddress: string,
+  ): Promise<ObligationInfo> {
+    try {
+      const marketPubkey = this.kaminoMarketAddress(marketAddressOrName);
+      if (!marketPubkey) {
+        throw httpNotFound(`Market not found: ${marketAddressOrName}`);
+      }
+
+      const wallet = await this.solana.getWallet(walletAddress);
+      const walletPubkey = new PublicKey(wallet.publicKey);
+
+      const connection = this.solana.connection;
+      const market = await getMarket({
+        connection,
+        marketPubkey,
+      });
+
+      const vanillaObligation = new VanillaObligation(
+        this.kaminoProgramId('KLEND'),
+      );
+
+      const obligation = await market.getObligationByWallet(
+        walletPubkey,
+        vanillaObligation,
+      );
+      if (!obligation) {
+        throw httpNotFound(`Obligation not found for wallet: ${walletAddress}`);
+      }
+
+      const obligationAddress = obligation.obligationAddress.toBase58();
+      const depositPositions = await Promise.all(
+        obligation.getDeposits().map(async (position) => {
+          const tokenPubkey = await this.solana.getToken(
+            position.mintAddress.toBase58(),
+          );
+          const reserve = market.getReserveByMint(
+            new PublicKey(tokenPubkey.address),
+          );
+          const tokenSymbol = tokenPubkey.symbol;
+          const reserveAddress = position.reserveAddress.toBase58();
+          const depositAmount = position.marketValueRefreshed
+            .div(reserve.getOracleMarketPrice())
+            .toNumber();
+          return {
+            reserveAddress,
+            tokenSymbol,
+            depositAmount,
+          };
+        }),
+      );
+      const borrowPositions = await Promise.all(
+        obligation.getBorrows().map(async (position) => {
+          const tokenPubkey = await this.solana.getToken(
+            position.mintAddress.toBase58(),
+          );
+          const reserve = market.getReserveByMint(
+            new PublicKey(tokenPubkey.address),
+          );
+
+          const tokenSymbol = tokenPubkey.symbol;
+          const reserveAddress = position.reserveAddress.toBase58();
+          const borrowAmount = position.marketValueRefreshed
+            .div(reserve.getOracleMarketPrice())
+            .toNumber();
+          return {
+            reserveAddress,
+            tokenSymbol,
+            borrowAmount,
+          };
+        }),
+      );
+      const currentLtv = obligation.refreshedStats.loanToValue.toNumber();
+      const maxLtv = obligation.refreshedStats.borrowLimit
+        .div(obligation.refreshedStats.userTotalDeposit)
+        .toNumber();
+      const liquidationLtv =
+        obligation.refreshedStats.liquidationLtv.toNumber();
+      return {
+        obligationAddress,
+        depositPositions,
+        borrowPositions,
+        maxLtv,
+        liquidationLtv,
+        currentLtv,
+      };
+    } catch (error) {
+      logger.error('Failed to get Kamino obligation:', error);
       throw error;
     }
   }

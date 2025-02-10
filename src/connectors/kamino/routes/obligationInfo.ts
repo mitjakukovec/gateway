@@ -1,41 +1,44 @@
 import { FastifyPluginAsync } from 'fastify';
-import type { ReserveInfoRequest, ReserveInfo } from '../kamino.interfaces';
+import type {
+  ObligationInfoRequest,
+  ObligationInfo,
+} from '../kamino.interfaces';
 import {
-  ReserveInfoRequestSchema,
-  ReserveInfoReplySchema,
+  ObligationInfoRequestSchema,
+  ObligationInfoReplySchema,
 } from '../kamino.interfaces';
 import { Kamino } from '../kamino';
 import { logger } from '../../../services/logger';
 
-export const reserveInfoRoute: FastifyPluginAsync = async (fastify) => {
+export const obligationInfoRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{
-    Querystring: ReserveInfoRequest;
-    Reply: ReserveInfo;
-  }>('/reserve-info', {
+    Querystring: ObligationInfoRequest;
+    Reply: ObligationInfo;
+  }>('/obligation-info', {
     schema: {
-      description: 'Get Kamino reserve info',
+      description: 'Get Kamino obligation info',
       tags: ['kamino'],
       querystring: {
-        ...ReserveInfoRequestSchema,
+        ...ObligationInfoRequestSchema,
         properties: {
           network: { type: 'string', examples: ['mainnet-beta'] },
           market: { type: 'string', examples: ['MAIN'] },
-          token: { type: 'string', examples: ['SOL'] },
+          wallet: { type: 'string', examples: ['<solana-wallet-address>'] },
         },
       },
       response: {
-        200: ReserveInfoReplySchema,
+        200: ObligationInfoReplySchema,
       },
     },
     handler: async (request, _reply) => {
       try {
-        const { market, token } = request.query;
+        const { market, wallet } = request.query;
         const network = request.query.network || 'mainnet-beta';
 
         const kamino = await Kamino.getInstance(network);
-        const reserve = await kamino.getReserve(market.toUpperCase(), token);
+        const obligation = await kamino.getObligation(market.toUpperCase(), wallet);
 
-        return reserve;
+        return obligation;
       } catch (e) {
         logger.error(e);
         if (e.statusCode) {
@@ -47,4 +50,4 @@ export const reserveInfoRoute: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-export default reserveInfoRoute;
+export default obligationInfoRoute;
