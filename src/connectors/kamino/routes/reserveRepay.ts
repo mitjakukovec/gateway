@@ -1,38 +1,40 @@
 import { FastifyPluginAsync } from 'fastify';
-import type { ReserveInfoRequest, ReserveInfoReply } from '../kamino.interfaces';
+import type { ReserveRepayRequest, ReserveRepayReply } from '../kamino.interfaces';
 import {
-  ReserveInfoRequestSchema,
-  ReserveInfoReplySchema,
+  ReserveRepayRequestSchema,
+  ReserveRepayReplySchema,
 } from '../kamino.interfaces';
 import { Kamino } from '../kamino';
 import { logger } from '../../../services/logger';
 
-export const reserveInfoRoute: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{
-    Querystring: ReserveInfoRequest;
-    Reply: ReserveInfoReply;
-  }>('/reserve-info', {
+export const reserveRepayRoute: FastifyPluginAsync = async (fastify) => {
+  fastify.post<{
+    Body: ReserveRepayRequest;
+    Reply: ReserveRepayReply;
+  }>('/reserve-repay', {
     schema: {
-      description: 'Get Kamino market reserve info',
+      description: 'Repay to Kamino market reserve',
       tags: ['kamino'],
-      querystring: {
-        ...ReserveInfoRequestSchema,
+      body: {
+        ...ReserveRepayRequestSchema,
         properties: {
           network: { type: 'string', examples: ['mainnet-beta'] },
           market: { type: 'string', examples: ['MAIN'] },
+          wallet: { type: 'string', examples: ['<solana-wallet-address>'] },
           token: { type: 'string', examples: ['SOL'] },
+          amount: { type: 'number', examples: [10] },
         },
       },
       response: {
-        200: ReserveInfoReplySchema,
+        200: ReserveRepayReplySchema,
       },
     },
     handler: async (request, _reply) => {
       try {
-        const { market, token } = request.query;
-        const network = request.query.network || 'mainnet-beta';
+        const { market, wallet, token, amount } = request.body;
+        const network = request.body.network || 'mainnet-beta';
         const kamino = await Kamino.getInstance(network);
-        return await kamino.getReserve(market.toUpperCase(), token);
+        return await kamino.reserveRepay(market.toUpperCase(), wallet, token, amount);
       } catch (e) {
         logger.error(e);
         if (e.statusCode) {
@@ -44,4 +46,4 @@ export const reserveInfoRoute: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-export default reserveInfoRoute;
+export default reserveRepayRoute;

@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import type { ReservesInfoRequest, ReservesInfo } from '../kamino.interfaces';
+import type { ReservesInfoRequest, ReservesInfoReply } from '../kamino.interfaces';
 import {
   ReservesInfoRequestSchema,
   ReservesInfoReplySchema,
@@ -10,10 +10,10 @@ import { logger } from '../../../services/logger';
 export const reservesInfoRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{
     Querystring: ReservesInfoRequest;
-    Reply: ReservesInfo;
+    Reply: ReservesInfoReply;
   }>('/reserves-info', {
     schema: {
-      description: 'Get Kamino reserves info',
+      description: 'Get Kamino market reserves info',
       tags: ['kamino'],
       querystring: {
         ...ReservesInfoRequestSchema,
@@ -30,11 +30,8 @@ export const reservesInfoRoute: FastifyPluginAsync = async (fastify) => {
       try {
         const { market } = request.query;
         const network = request.query.network || 'mainnet-beta';
-
         const kamino = await Kamino.getInstance(network);
-        const reserves = await kamino.getReserves(market.toUpperCase());
-
-        return reserves;
+        return await kamino.getReserves(market.toUpperCase());
       } catch (e) {
         logger.error(e);
         if (e.statusCode) {

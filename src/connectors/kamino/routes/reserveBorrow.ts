@@ -1,41 +1,40 @@
 import { FastifyPluginAsync } from 'fastify';
-import type {
-  ObligationInfoRequest,
-  ObligationInfoReply,
-} from '../kamino.interfaces';
+import type { ReserveBorrowRequest, ReserveBorrowReply } from '../kamino.interfaces';
 import {
-  ObligationInfoRequestSchema,
-  ObligationInfoReplySchema,
+  ReserveBorrowRequestSchema,
+  ReserveBorrowReplySchema,
 } from '../kamino.interfaces';
 import { Kamino } from '../kamino';
 import { logger } from '../../../services/logger';
 
-export const obligationInfoRoute: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{
-    Querystring: ObligationInfoRequest;
-    Reply: ObligationInfoReply;
-  }>('/obligation-info', {
+export const reserveBorrowRoute: FastifyPluginAsync = async (fastify) => {
+  fastify.post<{
+    Body: ReserveBorrowRequest;
+    Reply: ReserveBorrowReply;
+  }>('/reserve-borrow', {
     schema: {
-      description: 'Get Kamino market obligation info',
+      description: 'Borrow from Kamino market reserve',
       tags: ['kamino'],
-      querystring: {
-        ...ObligationInfoRequestSchema,
+      body: {
+        ...ReserveBorrowRequestSchema,
         properties: {
           network: { type: 'string', examples: ['mainnet-beta'] },
           market: { type: 'string', examples: ['MAIN'] },
           wallet: { type: 'string', examples: ['<solana-wallet-address>'] },
+          token: { type: 'string', examples: ['SOL'] },
+          amount: { type: 'number', examples: [10] },
         },
       },
       response: {
-        200: ObligationInfoReplySchema,
+        200: ReserveBorrowReplySchema,
       },
     },
     handler: async (request, _reply) => {
       try {
-        const { market, wallet } = request.query;
-        const network = request.query.network || 'mainnet-beta';
+        const { market, wallet, token, amount } = request.body;
+        const network = request.body.network || 'mainnet-beta';
         const kamino = await Kamino.getInstance(network);
-        return await kamino.getObligation(market.toUpperCase(), wallet);
+        return await kamino.reserveBorrow(market.toUpperCase(), wallet, token, amount);
       } catch (e) {
         logger.error(e);
         if (e.statusCode) {
@@ -47,4 +46,4 @@ export const obligationInfoRoute: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-export default obligationInfoRoute;
+export default reserveBorrowRoute;

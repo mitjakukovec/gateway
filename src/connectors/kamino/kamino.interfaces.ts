@@ -26,7 +26,7 @@ export const ReserveInfoReplySchema = Type.Object(
   { $id: 'ReserveInfoReply' },
 );
 
-export type ReserveInfo = Static<typeof ReserveInfoReplySchema>;
+export type ReserveInfoReply = Static<typeof ReserveInfoReplySchema>;
 
 export const ReservesInfoRequestSchema = Type.Object(
   {
@@ -53,7 +53,7 @@ export const ReservesInfoReplySchema = Type.Array(
   { $id: 'ReservesInfoReply' },
 );
 
-export type ReservesInfo = Static<typeof ReservesInfoReplySchema>;
+export type ReservesInfoReply = Static<typeof ReservesInfoReplySchema>;
 
 export const ObligationInfoRequestSchema = Type.Object(
   {
@@ -90,4 +90,48 @@ export const ObligationInfoReplySchema = Type.Object(
   { $id: 'ObligationInfoReply' },
 );
 
-export type ObligationInfo = Static<typeof ObligationInfoReplySchema>;
+export type ObligationInfoReply = Static<typeof ObligationInfoReplySchema>;
+
+export const ReserveBorrowRequestSchema = Type.Object(
+  {
+    network: Type.Optional(Type.String()),
+    market: Type.String(),
+    wallet: Type.String(),
+    token: Type.String(),
+    amount: Type.Number(),
+  },
+  { $id: 'ReserveBorrowRequest' },
+);
+
+export type ReserveBorrowRequest = Static<typeof ReserveBorrowRequestSchema>;
+
+export const ReserveBorrowReplySchema = Type.Object(
+  {
+
+  },
+  { $id: 'ReserveBorrowReply' },
+);
+
+export type ReserveBorrowReply = Static<typeof ReserveBorrowReplySchema>;
+
+export const ReserveRepayRequestSchema = Type.Object(
+  {
+    network: Type.Optional(Type.String()),
+    market: Type.String(),
+    wallet: Type.String(),
+    token: Type.String(),
+    amount: Type.Number(),
+  },
+  { $id: 'ReserveRepayRequest' },
+);
+
+export type ReserveRepayRequest = Static<typeof ReserveRepayRequestSchema>;
+
+export const ReserveRepayReplySchema = Type.Object(
+  {
+
+  },
+  { $id: 'ReserveRepayReply' },
+);
+
+export type ReserveRepayReply = Static<typeof ReserveRepayReplySchema>;

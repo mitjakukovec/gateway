@@ -2,12 +2,19 @@ import { Solana } from '../../chains/solana/solana';
 import { PublicKey } from '@solana/web3.js';
 import { KaminoConfig } from './kamino.config';
 import type {
-  ReserveInfo,
-  ReservesInfo,
-  ObligationInfo,
+  ReserveInfoReply,
+  ReservesInfoReply,
+  ObligationInfoReply,
+  ReserveBorrowReply,
+  ReserveRepayReply,
 } from './kamino.interfaces';
+import Decimal from 'decimal.js';
 import { getMarket } from './kamino.utils';
-import { VanillaObligation } from '@kamino-finance/klend-sdk';
+import {
+  KaminoAction,
+  VanillaObligation,
+  buildAndSendTxn,
+} from '@kamino-finance/klend-sdk';
 import { httpNotFound } from '../../services/error-handler';
 import { logger } from '../../services/logger';
 
@@ -25,7 +32,7 @@ export class Kamino {
     this.kaminoMarketAddresses = null;
   }
 
-  private kaminoProgramId(programAddressOrName: string): PublicKey {
+  private getProgramId(programAddressOrName: string): PublicKey {
     const entry = Object.entries(this.kaminoProgramIds).find(([key, value]) => {
       return key === programAddressOrName || value === programAddressOrName;
     });
@@ -34,7 +41,7 @@ export class Kamino {
     }
   }
 
-  private kaminoMarketAddress(marketAddressOrName: string): PublicKey {
+  private getMarketAddress(marketAddressOrName: string): PublicKey {
     const entry = Object.entries(this.kaminoMarketAddresses).find(
       ([key, value]) => {
         return key === marketAddressOrName || value === marketAddressOrName;
@@ -75,16 +82,17 @@ export class Kamino {
   async getReserve(
     marketAddressOrName: string,
     tokenAddressOrSymbol: string,
-  ): Promise<ReserveInfo> {
+  ): Promise<ReserveInfoReply> {
     try {
-      const marketPubkey = this.kaminoMarketAddress(marketAddressOrName);
+      const marketPubkey = this.getMarketAddress(marketAddressOrName);
       if (!marketPubkey) {
         throw httpNotFound(`Market not found: ${marketAddressOrName}`);
       }
-      const tokenPubkey = await this.solana.getToken(tokenAddressOrSymbol);
-      if (!tokenPubkey) {
+      const tokenInfo = await this.solana.getToken(tokenAddressOrSymbol);
+      if (!tokenInfo) {
         throw httpNotFound(`Token not found: ${tokenAddressOrSymbol}`);
       }
+      const tokenPubkey = new PublicKey(tokenInfo.address);
 
       const connection = this.solana.connection;
       const market = await getMarket({
@@ -92,9 +100,7 @@ export class Kamino {
         marketPubkey,
       });
 
-      const reserve = market.getReserveByMint(
-        new PublicKey(tokenPubkey.address),
-      );
+      const reserve = market.getReserveByMint(tokenPubkey);
       if (!reserve) {
         throw httpNotFound(`Reserve not found: ${tokenAddressOrSymbol}`);
       }
@@ -129,15 +135,15 @@ export class Kamino {
         borrowFactor,
       };
     } catch (error) {
-      logger.error('Failed to get Kamino reserve:', error);
+      logger.error('Failed to get Kamino market reserve:', error);
       throw error;
     }
   }
 
   /** Get Kamino market reserves */
-  async getReserves(marketAddressOrName: string): Promise<ReservesInfo> {
+  async getReserves(marketAddressOrName: string): Promise<ReservesInfoReply> {
     try {
-      const marketPubkey = this.kaminoMarketAddress(marketAddressOrName);
+      const marketPubkey = this.getMarketAddress(marketAddressOrName);
       if (!marketPubkey) {
         throw httpNotFound(`Market not found: ${marketAddressOrName}`);
       }
@@ -183,7 +189,7 @@ export class Kamino {
         };
       });
     } catch (error) {
-      logger.error('Failed to get Kamino reserves:', error);
+      logger.error('Failed to get Kamino market reserves:', error);
       throw error;
     }
   }
@@ -192,14 +198,17 @@ export class Kamino {
   async getObligation(
     marketAddressOrName: string,
     walletAddress: string,
-  ): Promise<ObligationInfo> {
+  ): Promise<ObligationInfoReply> {
     try {
-      const marketPubkey = this.kaminoMarketAddress(marketAddressOrName);
+      const marketPubkey = this.getMarketAddress(marketAddressOrName);
       if (!marketPubkey) {
         throw httpNotFound(`Market not found: ${marketAddressOrName}`);
       }
 
       const wallet = await this.solana.getWallet(walletAddress);
+      if (!wallet) {
+        throw httpNotFound(`Wallet not found: ${walletAddress}`);
+      }
       const walletPubkey = new PublicKey(wallet.publicKey);
 
       const connection = this.solana.connection;
@@ -209,7 +218,7 @@ export class Kamino {
       });
 
       const vanillaObligation = new VanillaObligation(
-        this.kaminoProgramId('KLEND'),
+        this.getProgramId('KLEND'),
       );
 
       const obligation = await market.getObligationByWallet(
@@ -231,8 +240,8 @@ export class Kamino {
           );
           const tokenSymbol = tokenPubkey.symbol;
           const reserveAddress = position.reserveAddress.toBase58();
-          const depositAmount = position.marketValueRefreshed
-            .div(reserve.getOracleMarketPrice())
+          const depositAmount = position.amount
+            .div(reserve.getMintFactor())
             .toNumber();
           return {
             reserveAddress,
@@ -249,11 +258,10 @@ export class Kamino {
           const reserve = market.getReserveByMint(
             new PublicKey(tokenPubkey.address),
           );
-
           const tokenSymbol = tokenPubkey.symbol;
           const reserveAddress = position.reserveAddress.toBase58();
-          const borrowAmount = position.marketValueRefreshed
-            .div(reserve.getOracleMarketPrice())
+          const borrowAmount = position.amount
+            .div(reserve.getMintFactor())
             .toNumber();
           return {
             reserveAddress,
@@ -277,7 +285,172 @@ export class Kamino {
         currentLtv,
       };
     } catch (error) {
-      logger.error('Failed to get Kamino obligation:', error);
+      logger.error('Failed to get Kamino market obligation:', error);
+      throw error;
+    }
+  }
+
+  /** Borrow from Kamino market reserve */
+  async reserveBorrow(
+    marketAddressOrName: string,
+    walletAddress: string,
+    tokenAddressOrSymbol: string,
+    tokenAmount: number,
+  ): Promise<ReserveBorrowReply> {
+    try {
+      const marketPubkey = this.getMarketAddress(marketAddressOrName);
+      if (!marketPubkey) {
+        throw httpNotFound(`Market not found: ${marketAddressOrName}`);
+      }
+      const tokenInfo = await this.solana.getToken(tokenAddressOrSymbol);
+      if (!tokenInfo) {
+        throw httpNotFound(`Token not found: ${tokenAddressOrSymbol}`);
+      }
+      const tokenPubkey = new PublicKey(tokenInfo.address);
+
+      const wallet = await this.solana.getWallet(walletAddress);
+      if (!wallet) {
+        throw httpNotFound(`Wallet not found: ${walletAddress}`);
+      }
+      const walletPubkey = new PublicKey(wallet.publicKey);
+
+      const connection = this.solana.connection;
+      const market = await getMarket({
+        connection,
+        marketPubkey,
+      });
+
+      const reserve = market.getReserveByMint(tokenPubkey);
+      if (!reserve) {
+        throw httpNotFound(`Reserve not found: ${tokenAddressOrSymbol}`);
+      }
+
+      const vanillaObligation = new VanillaObligation(
+        this.getProgramId('KLEND'),
+      );
+
+      const obligation = await market.getObligationByWallet(
+        walletPubkey,
+        vanillaObligation,
+      );
+      if (!obligation) {
+        throw httpNotFound(`Obligation not found for wallet: ${walletAddress}`);
+      }
+
+      const amount = new Decimal(tokenAmount)
+        .mul(reserve.getMintFactor())
+        .toString();
+
+      const borrowAction = await KaminoAction.buildBorrowTxns(
+        market,
+        amount,
+        tokenPubkey,
+        walletPubkey,
+        obligation,
+      );
+
+      const borrowIxs = [
+        ...borrowAction.setupIxs,
+        ...borrowAction.lendingIxs,
+        ...borrowAction.cleanupIxs,
+      ];
+
+      const borrowTxHash = await buildAndSendTxn(
+        connection,
+        wallet,
+        borrowIxs,
+        [],
+      );
+
+      console.log('txHash borrowDebt', borrowTxHash);
+
+      return {};
+    } catch (error) {
+      logger.error('Failed to borrow from Kamino market reserve:', error);
+      throw error;
+    }
+  }
+
+  /** Repay to Kamino market reserve */
+  async reserveRepay(
+    marketAddressOrName: string,
+    walletAddress: string,
+    tokenAddressOrSymbol: string,
+    tokenAmount: number,
+  ): Promise<ReserveRepayReply> {
+    try {
+      const marketPubkey = this.getMarketAddress(marketAddressOrName);
+      if (!marketPubkey) {
+        throw httpNotFound(`Market not found: ${marketAddressOrName}`);
+      }
+      const tokenInfo = await this.solana.getToken(tokenAddressOrSymbol);
+      if (!tokenInfo) {
+        throw httpNotFound(`Token not found: ${tokenAddressOrSymbol}`);
+      }
+      const tokenPubkey = new PublicKey(tokenInfo.address);
+
+      const wallet = await this.solana.getWallet(walletAddress);
+      if (!wallet) {
+        throw httpNotFound(`Wallet not found: ${walletAddress}`);
+      }
+      const walletPubkey = new PublicKey(wallet.publicKey);
+
+      const connection = this.solana.connection;
+      const market = await getMarket({
+        connection,
+        marketPubkey,
+      });
+
+      const reserve = market.getReserveByMint(tokenPubkey);
+      if (!reserve) {
+        throw httpNotFound(`Reserve not found: ${tokenAddressOrSymbol}`);
+      }
+
+      const currentSlot = await connection.getSlot();
+
+      const vanillaObligation = new VanillaObligation(
+        this.getProgramId('KLEND'),
+      );
+
+      const obligation = await market.getObligationByWallet(
+        walletPubkey,
+        vanillaObligation,
+      );
+      if (!obligation) {
+        throw httpNotFound(`Obligation not found for wallet: ${walletAddress}`);
+      }
+
+      const amount = new Decimal(tokenAmount)
+        .mul(reserve.getMintFactor())
+        .toString();
+
+      const repayAction = await KaminoAction.buildRepayTxns(
+        market,
+        amount,
+        tokenPubkey,
+        walletPubkey,
+        obligation,
+        currentSlot,
+      );
+
+      const repayIxs = [
+        ...repayAction.setupIxs,
+        ...repayAction.lendingIxs,
+        ...repayAction.cleanupIxs,
+      ];
+
+      const repayTxHash = await buildAndSendTxn(
+        connection,
+        wallet,
+        repayIxs,
+        [],
+      );
+
+      console.log('txHash repayDebt', repayTxHash);
+
+      return {};
+    } catch (error) {
+      logger.error('Failed to repay to Kamino market reserve:', error);
       throw error;
     }
   }
