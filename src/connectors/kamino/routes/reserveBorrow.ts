@@ -1,12 +1,25 @@
 import { FastifyPluginAsync } from 'fastify';
-import type { ReserveBorrowRequest, ReserveBorrowReply } from '../kamino.interfaces';
+import Decimal from 'decimal.js';
+import { PublicKey } from '@solana/web3.js';
+import type {
+  ReserveBorrowRequest,
+  ReserveBorrowReply,
+} from '../kamino.interfaces';
 import {
   ReserveBorrowRequestSchema,
   ReserveBorrowReplySchema,
 } from '../kamino.interfaces';
 import { Kamino } from '../kamino';
+import {
+  KaminoAction,
+  VanillaObligation,
+  buildAndSendTxn,
+} from '@kamino-finance/klend-sdk';
+import { Solana } from '../../../chains/solana/solana';
+import { httpNotFound } from '../../../services/error-handler';
 import { logger } from '../../../services/logger';
 
+/** Borrow from Kamino market reserve */
 export const reserveBorrowRoute: FastifyPluginAsync = async (fastify) => {
   fastify.post<{
     Body: ReserveBorrowRequest;
@@ -31,14 +44,91 @@ export const reserveBorrowRoute: FastifyPluginAsync = async (fastify) => {
     },
     handler: async (request, _reply) => {
       try {
-        const { market, wallet, token, amount } = request.body;
+        const {
+          market: marketAddressOrName,
+          wallet: walletAddress,
+          token: tokenAddressOrSymbol,
+          amount: tokenAmount,
+        } = request.body;
+
         const network = request.body.network || 'mainnet-beta';
+        const solana = await Solana.getInstance(network);
         const kamino = await Kamino.getInstance(network);
-        return await kamino.reserveBorrow(market.toUpperCase(), wallet, token, amount);
-      } catch (e) {
-        logger.error(e);
-        if (e.statusCode) {
-          throw fastify.httpErrors.createError(e.statusCode, 'Request failed');
+
+        const marketPubkey = kamino.getMarketAddress(marketAddressOrName);
+        if (!marketPubkey) {
+          throw httpNotFound(`Market not found: ${marketAddressOrName}`);
+        }
+
+        const tokenInfo = await solana.getToken(tokenAddressOrSymbol);
+        if (!tokenInfo) {
+          throw httpNotFound(`Token not found: ${tokenAddressOrSymbol}`);
+        }
+        const tokenPubkey = new PublicKey(tokenInfo.address);
+
+        const wallet = await solana.getWallet(walletAddress);
+        if (!wallet) {
+          throw httpNotFound(`Wallet not found: ${walletAddress}`);
+        }
+        const walletPubkey = new PublicKey(wallet.publicKey);
+
+        const connection = solana.connection;
+        const market = await kamino.getMarket({
+          connection,
+          marketPubkey,
+        });
+
+        const reserve = market.getReserveByMint(tokenPubkey);
+        if (!reserve) {
+          throw httpNotFound(`Reserve not found: ${tokenAddressOrSymbol}`);
+        }
+
+        const vanillaObligation = new VanillaObligation(
+          kamino.getProgramId('KLEND'),
+        );
+
+        const obligation = await market.getObligationByWallet(
+          walletPubkey,
+          vanillaObligation,
+        );
+        if (!obligation) {
+          throw httpNotFound(
+            `Obligation not found for wallet: ${walletAddress}`,
+          );
+        }
+
+        const amount = new Decimal(tokenAmount)
+          .mul(reserve.getMintFactor())
+          .toString();
+
+        const borrowAction = await KaminoAction.buildBorrowTxns(
+          market,
+          amount,
+          tokenPubkey,
+          walletPubkey,
+          obligation,
+        );
+
+        const borrowIxs = [
+          ...borrowAction.setupIxs,
+          ...borrowAction.lendingIxs,
+          ...borrowAction.cleanupIxs,
+        ];
+
+        const borrowTxHash = await buildAndSendTxn(
+          connection,
+          wallet,
+          borrowIxs,
+          [],
+        );
+
+        console.log('txHash borrowDebt', borrowTxHash);
+
+        return {};
+      } catch (error) {
+        logger.error('Failed to borrow from Kamino market reserve:', error);
+        if (error.statusCode) {
+          throw fastify.httpErrors.createError(error.statusCode, 'Request failed');
         }
         throw fastify.httpErrors.internalServerError('Internal server error');
       }
