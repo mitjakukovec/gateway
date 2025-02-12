@@ -12,3 +12,6 @@ services:
             - ../certs:/home/gateway/certs
         environment:
             - DEV=true
+            - GATEWAY_PASSPHRASE=12345
+        command: ["sh", "-c", "if [ \"$$DEV\" = \"true\" ]; then pnpm start --passphrase=\"$$GATEWAY_PASSPHRASE\" --dev; else pnpm start; fi"]
+        restart: always
