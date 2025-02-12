@@ -392,11 +392,10 @@ export class Solana {
         .map((item) => item.prioritizationFee)
         .filter((fee) => fee > 0);
 
-      // minimum fee is the minimum fee per compute unit
-      const minimumFee = this.config.minPriorityFee / this.config.defaultComputeUnits * 1_000_000;
-
+      const minimumFeeLamports = this.config.minPriorityFee * 1e9 / this.config.defaultComputeUnits;
+      console.log('minimumFeeLamports', minimumFeeLamports);
       if (fees.length === 0) {
-        return minimumFee;
+        return minimumFeeLamports;
       }
 
       // Sort fees in ascending order for percentile calculation
@@ -413,7 +412,6 @@ export class Solana {
       let basePriorityFee = fees[percentileIndex - 1] / 1_000_000;  // Convert to lamports
       
       // Ensure fee is not below minimum (convert SOL to lamports)
-      const minimumFeeLamports = Math.floor(this.config.minPriorityFee * 1e9 / this.config.defaultComputeUnits);
       basePriorityFee = Math.max(basePriorityFee, minimumFeeLamports);
       
       logger.info(`Base priority fee: ${basePriorityFee.toFixed(4)} lamports/CU (${basePriorityFee === minimumFeeLamports ? 'minimum' : `${this.config.basePriorityFeePct}th percentile`})`);
@@ -485,12 +483,11 @@ export class Solana {
     signers: Signer[] = [],
     computeUnits?: number
   ): Promise<{ signature: string; fee: number }> {
-    let currentPriorityFee = Math.floor(await this.estimatePriorityFees());
+    let currentPriorityFee = await this.estimatePriorityFees();
     const computeUnitsToUse = computeUnits || this.config.defaultComputeUnits;
     
     while (true) {
       const basePriorityFeeLamports = currentPriorityFee * computeUnitsToUse;
-      
       logger.info(`Sending transaction with ${currentPriorityFee} lamports/CU priority fee and max priority fee of ${(basePriorityFeeLamports * LAMPORT_TO_SOL).toFixed(6)} SOL`);
       
       // Check if we've exceeded max fee (convert maxPriorityFee from SOL to lamports)
@@ -546,7 +543,7 @@ export class Solana {
       // If we get here, transaction wasn't confirmed after RETRY_COUNT attempts
       // Increase the priority fee and try again
       currentPriorityFee = Math.floor(currentPriorityFee * this.config.priorityFeeMultiplier);
-      logger.info(`Increasing max priority fee to ${currentPriorityFee} lamports/CU priority fee and max priority fee of ${(currentPriorityFee * computeUnitsToUse * LAMPORT_TO_SOL).toFixed(6)} SOL`);
+      logger.info(`Increasing priority fee to ${currentPriorityFee} lamports/CU (max fee of ${(currentPriorityFee * computeUnitsToUse * LAMPORT_TO_SOL).toFixed(6)} SOL`);
     }
   }
 
@@ -556,9 +553,9 @@ export class Solana {
     computeUnitsToUse: number,
     signers: Signer[]
   ): Promise<Transaction> {
-    // Add priority fee instruction (converting to microLamports)
+    const priorityFeeMicroLamports = Math.floor(currentPriorityFee * 1_000_000);
     const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports: currentPriorityFee * 1_000_000,
+      microLamports: priorityFeeMicroLamports,
     });
   
     // Remove any existing priority fee instructions and add the new one
@@ -597,12 +594,11 @@ export class Solana {
     let modifiedTx: VersionedTransaction;
 
     // Create new compute budget instructions
+    const priorityFeeMicroLamports = Math.floor(currentPriorityFee * 1_000_000);
     const computeBudgetInstructions = [
       ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnits }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: currentPriorityFee * 1_000_000 })
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeMicroLamports })
     ];
-
-    console.log('Priority fee in lamports/CU:', currentPriorityFee);
 
     // Check if ComputeBudgetProgram is in static keys
     const computeBudgetProgramIndex = originalMessage.staticAccountKeys.findIndex(
@@ -1044,7 +1040,7 @@ export class Solana {
       // If we get here, transaction wasn't confirmed after RETRY_COUNT attempts
       // Increase the priority fee and try again
       currentPriorityFee = Math.floor(currentPriorityFee * this.config.priorityFeeMultiplier);
-      logger.info(`Increasing max priority fee to ${currentPriorityFee} lamports/CU priority fee and max priority fee of ${(currentPriorityFee * computeUnitsToUse * LAMPORT_TO_SOL).toFixed(6)} SOL`);
+      logger.info(`Increasing priority fee to ${currentPriorityFee} lamports/CU (max fee of ${(currentPriorityFee * computeUnitsToUse * LAMPORT_TO_SOL).toFixed(6)} SOL`);
     }
   }
 
