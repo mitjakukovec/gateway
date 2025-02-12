@@ -116,7 +116,7 @@ export const reserveRepayRoute: FastifyPluginAsync = async (fastify) => {
         const priorityFeePerComputeUnit = await solana.estimatePriorityFees();
         const defaultComputeUnits = solana.config.defaultComputeUnits;
         const priorityFee = new Decimal(
-          solana.config.defaultComputeUnits * priorityFeePerComputeUnit * 100,
+          solana.config.defaultComputeUnits * priorityFeePerComputeUnit,
         );
 
         const computeIxs = getComputeBudgetAndPriorityFeeIxns(
