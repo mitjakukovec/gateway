@@ -14,6 +14,7 @@ import {
   KaminoAction,
   VanillaObligation,
   buildAndSendTxn,
+  getComputeBudgetAndPriorityFeeIxns,
 } from '@kamino-finance/klend-sdk';
 import { Solana } from '../../../chains/solana/solana';
 import { httpNotFound } from '../../../services/error-handler';
@@ -112,29 +113,39 @@ export const reserveRepayRoute: FastifyPluginAsync = async (fastify) => {
           currentSlot,
         );
 
+        const priorityFeePerComputeUnit = await solana.estimatePriorityFees();
+        const defaultComputeUnits = solana.config.defaultComputeUnits;
+        const priorityFee = new Decimal(
+          solana.config.defaultComputeUnits * priorityFeePerComputeUnit * 100,
+        );
+
+        const computeIxs = getComputeBudgetAndPriorityFeeIxns(
+          defaultComputeUnits,
+          priorityFee,
+        );
+
         const repayIxs = [
+          ...computeIxs,
           ...repayAction.setupIxs,
           ...repayAction.lendingIxs,
           ...repayAction.cleanupIxs,
         ];
 
-        const repayTxHash = await buildAndSendTxn(
-          connection,
-          wallet,
-          repayIxs,
-          [],
-        );
-
-        console.log('txHash repayDebt', repayTxHash);
-
-        return {};
-      } catch (error) {
-        logger.error('Failed to repay to Kamino market reserve:', error);
-        if (error.statusCode) {
-          throw fastify.httpErrors.createError(
-            error.statusCode,
-            'Request failed',
+        try {
+          const signature = await buildAndSendTxn(
+            connection,
+            wallet,
+            repayIxs,
+            [],
           );
+          return { signature };
+        } catch {
+          throw new Error('Transaction failed');
+        }
+      } catch (error) {
+        logger.error('\nFailed to repay to Kamino market reserve:', error);
+        if (error.statusCode) {
+          throw fastify.httpErrors.createError(error.statusCode, 'Request failed');
         }
         throw fastify.httpErrors.internalServerError('Internal server error');
       }

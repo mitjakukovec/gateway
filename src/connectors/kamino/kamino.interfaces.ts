@@ -107,7 +107,7 @@ export type ReserveBorrowRequest = Static<typeof ReserveBorrowRequestSchema>;
 
 export const ReserveBorrowReplySchema = Type.Object(
   {
-
+    signature: Type.String()
   },
   { $id: 'ReserveBorrowReply' },
 );
@@ -129,7 +129,7 @@ export type ReserveRepayRequest = Static<typeof ReserveRepayRequestSchema>;
 
 export const ReserveRepayReplySchema = Type.Object(
   {
-
+    signature: Type.String()
   },
   { $id: 'ReserveRepayReply' },
 );

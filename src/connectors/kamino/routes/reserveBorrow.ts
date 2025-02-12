@@ -14,6 +14,7 @@ import {
   KaminoAction,
   VanillaObligation,
   buildAndSendTxn,
+  getComputeBudgetAndPriorityFeeIxns,
 } from '@kamino-finance/klend-sdk';
 import { Solana } from '../../../chains/solana/solana';
 import { httpNotFound } from '../../../services/error-handler';
@@ -109,24 +110,37 @@ export const reserveBorrowRoute: FastifyPluginAsync = async (fastify) => {
           obligation,
         );
 
+        const priorityFeePerComputeUnit = await solana.estimatePriorityFees();
+        const defaultComputeUnits = solana.config.defaultComputeUnits;
+        const priorityFee = new Decimal(
+          solana.config.defaultComputeUnits * priorityFeePerComputeUnit * 100,
+        );
+
+        const computeIxs = getComputeBudgetAndPriorityFeeIxns(
+          defaultComputeUnits,
+          priorityFee,
+        );
+
         const borrowIxs = [
+          ...computeIxs,
           ...borrowAction.setupIxs,
           ...borrowAction.lendingIxs,
           ...borrowAction.cleanupIxs,
         ];
 
-        const borrowTxHash = await buildAndSendTxn(
-          connection,
-          wallet,
-          borrowIxs,
-          [],
-        );
-
-        console.log('txHash borrowDebt', borrowTxHash);
-
-        return {};
+        try {
+          const signature = await buildAndSendTxn(
+            connection,
+            wallet,
+            borrowIxs,
+            [],
+          );
+          return { signature };
+        } catch {
+          throw new Error('Transaction failed');
+        }
       } catch (error) {
-        logger.error('Failed to borrow from Kamino market reserve:', error);
+        logger.error('\nFailed to borrow from Kamino market reserve:', error);
         if (error.statusCode) {
           throw fastify.httpErrors.createError(error.statusCode, 'Request failed');
         }
