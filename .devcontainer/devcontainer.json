@@ -1,0 +1,39 @@
+{
+    "name": "${localWorkspaceFolderBasename}",
+    "service": "gateway",
+    "workspaceFolder": "/home/gateway",
+    "mounts": [
+        {
+            "source": "${localWorkspaceFolder}",
+            "target": "/home/gateway",
+            "type": "bind"
+        },
+        {
+            "source": "${localEnv:HOME}/.ssh",
+            "target": "/root/.ssh:ro",
+            "type": "bind"
+        }
+    ],
+    "runServices": [
+        "gateway"
+    ],
+    "dockerComposeFile": "compose.yaml",
+    "onCreateCommand": "apt-get update && apt-get install -y git moreutils procps",
+    "overrideCommand": false,
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "stylelint.vscode-stylelint",
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "redhat.vscode-yaml",
+                "tamasfe.even-better-toml",
+                "DavidAnson.vscode-markdownlint",
+                "shd101wyy.markdown-preview-enhanced",
+                "semanticdiff.semanticdiff",
+                "sourcegraph.cody-ai",
+                "mhutchie.git-graph"
+            ]
+        }
+    }
+}

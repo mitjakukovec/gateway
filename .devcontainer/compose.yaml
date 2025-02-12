@@ -1,0 +1,14 @@
+services:
+    gateway:
+        build:
+            context: ..
+            dockerfile: Dockerfile
+        ports:
+            - "15888:15888"
+        volumes:
+            - ../conf:/home/gateway/conf
+            - ../logs:/home/gateway/logs  
+            - ../db:/home/gateway/db
+            - ../certs:/home/gateway/certs
+        environment:
+            - DEV=true
