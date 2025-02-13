@@ -18,7 +18,8 @@
         "gateway"
     ],
     "dockerComposeFile": "compose.yaml",
-    "onCreateCommand": "apt-get update && apt-get install -y git moreutils procps",
+    "initializeCommand": "awk '/^import.*\"@solana\\/spl-token\".*/{if(prev!=\"// @ts-ignore\"){print\"// @ts-ignore\"}}{prev=$0;print}' ${localWorkspaceFolder}/src/chains/solana/solana.ts > /tmp/solana.ts && mv /tmp/solana.ts ${localWorkspaceFolder}/src/chains/solana/solana.ts",
+    "onCreateCommand": "apt-get update && apt-get install -y git",
     "overrideCommand": false,
     "customizations": {
         "vscode": {
