@@ -1,12 +1,12 @@
 import { FastifyPluginAsync } from 'fastify';
-import { RaydiumCLMM } from '../raydium-clmm';
+import { Raydium } from '../raydium';
 import { logger } from '../../../services/logger';
 import { 
   GetPoolInfoRequestType, 
   GetPoolInfoRequest,
+  PoolInfo,
   PoolInfoSchema
 } from '../../../services/clmm-interfaces';
-import { PoolInfo } from '../../../services/clmm-interfaces';
 
 export const poolInfoRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{
@@ -38,8 +38,8 @@ export const poolInfoRoute: FastifyPluginAsync = async (fastify) => {
         const { poolAddress } = request.query;
         const network = request.query.network || 'mainnet-beta';
         
-        const raydium = await RaydiumCLMM.getInstance(network);
-        const poolInfo = await raydium.getPoolInfo(poolAddress);
+        const raydium = await Raydium.getInstance(network);
+        const poolInfo = await raydium.getClmmPoolInfo(poolAddress);
         if (!poolInfo) throw fastify.httpErrors.notFound('Pool not found');
         return poolInfo;
       } catch (e) {

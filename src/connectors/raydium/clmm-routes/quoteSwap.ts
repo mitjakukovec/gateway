@@ -1,5 +1,5 @@
 import { FastifyPluginAsync, FastifyInstance } from 'fastify';
-import { RaydiumCLMM } from '../raydium-clmm';
+import { Raydium } from '../raydium';
 import { Solana } from '../../../chains/solana/solana';
 import { DecimalUtil } from '@orca-so/common-sdk';
 import { Decimal } from 'decimal.js';
@@ -29,7 +29,7 @@ export async function getSwapQuote(
   slippagePct?: number
 ) {
   const solana = await Solana.getInstance(network);
-  const raydium = await RaydiumCLMM.getInstance(network);
+  const raydium = await Raydium.getInstance(network);
   const baseToken = await solana.getToken(baseTokenSymbol);
   const quoteToken = await solana.getToken(quoteTokenSymbol);
   
@@ -63,23 +63,26 @@ export async function getSwapQuote(
   })
   const effectiveSlippage = new BN((slippagePct ?? raydium.getSlippagePct()) / 100);
 
+  // Convert BN to number for slippage
+  const effectiveSlippageNumber = effectiveSlippage.toNumber();
+
   // AmountOut = swapQuote, AmountOutBaseOut = swapQuoteExactOut
   const response : ReturnTypeComputeAmountOutFormat | ReturnTypeComputeAmountOutBaseOut = side === 'buy' 
   ? await PoolUtils.computeAmountIn({
     poolInfo: clmmPoolInfo,
     tickArrayCache: tickCache[poolAddress],
     amountOut: amount_bn,
-    epochInfo: await raydium.raydium.fetchEpochInfo(),
+    epochInfo: await raydium.raydiumSDK.fetchEpochInfo(),
     baseMint: new PublicKey(poolInfo['mintB'].address),
-    slippage: effectiveSlippage,
+    slippage: effectiveSlippageNumber,
   })
   : await PoolUtils.computeAmountOutFormat({
       poolInfo: clmmPoolInfo,
       tickArrayCache: tickCache[poolAddress],
       amountIn: amount_bn,
       tokenOut: poolInfo['mintB'],
-      slippage: effectiveSlippage,
-      epochInfo: await raydium.raydium.fetchEpochInfo(),
+      slippage: effectiveSlippageNumber,
+      epochInfo: await raydium.raydiumSDK.fetchEpochInfo(),
       catchLiquidityInsufficient: true,
     })
 
