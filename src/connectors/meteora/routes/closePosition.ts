@@ -24,11 +24,26 @@ async function closePosition(
     const meteora = await Meteora.getInstance(network);
     const wallet = await solana.getWallet(walletAddress);
 
-    const positionInfo = await meteora.getPositionInfo(positionAddress, wallet.publicKey);
-    logger.debug('Position Info:', positionInfo);
+    const { position, info } = await meteora.getRawPosition(
+      positionAddress,
+      wallet.publicKey
+    );
 
-    const dlmmPool = await meteora.getDlmmPool(positionInfo.poolAddress);
-    logger.debug('DLMM Pool:', dlmmPool);
+    if (!position) {
+      throw fastify.httpErrors.notFound(`Position not found: ${positionAddress}`);
+    }
+
+    const dlmmPool = await meteora.getDlmmPool(info.publicKey.toBase58());
+    if (!dlmmPool) {
+      throw fastify.httpErrors.notFound(`Pool not found for position: ${positionAddress}`);
+    }
+
+    const positionInfo = {
+      baseTokenAmount: Number(position.positionData.totalXAmount),
+      quoteTokenAmount: Number(position.positionData.totalYAmount),
+      baseFeeAmount: Number(position.positionData.feeX),
+      quoteFeeAmount: Number(position.positionData.feeY),
+    };
 
     // Remove liquidity if baseTokenAmount or quoteTokenAmount is greater than 0
     const removeLiquidityResult = (positionInfo.baseTokenAmount > 0 || positionInfo.quoteTokenAmount > 0)
@@ -42,7 +57,6 @@ async function closePosition(
 
     // Now close the position
     logger.info(`Closing position ${positionAddress}`);
-    const { position } = await meteora.getRawPosition(positionAddress, wallet.publicKey);
     logger.debug('Raw position data:', position);
     logger.debug('Creating close position transaction with params:', {
       owner: wallet.publicKey.toString(),
