@@ -135,3 +135,47 @@ export const ReserveRepayReplySchema = Type.Object(
 );
 
 export type ReserveRepayReply = Static<typeof ReserveRepayReplySchema>;
+
+export const ReserveDepositRequestSchema = Type.Object(
+  {
+    network: Type.Optional(Type.String()),
+    market: Type.String(),
+    wallet: Type.String(),
+    token: Type.String(),
+    amount: Type.Number(),
+  },
+  { $id: 'ReserveDepositRequest' },
+);
+
+export type ReserveDepositRequest = Static<typeof ReserveDepositRequestSchema>;
+
+export const ReserveDepositReplySchema = Type.Object(
+  {
+    signature: Type.String()
+  },
+  { $id: 'ReserveDepositReply' },
+);
+
+export type ReserveDepositReply = Static<typeof ReserveDepositReplySchema>;
+
+export const ReserveWithdrawRequestSchema = Type.Object(
+  {
+    network: Type.Optional(Type.String()),
+    market: Type.String(),
+    wallet: Type.String(),
+    token: Type.String(),
+    amount: Type.Number(),
+  },
+  { $id: 'ReserveWithdrawRequest' },
+);
+
+export type ReserveWithdrawRequest = Static<typeof ReserveWithdrawRequestSchema>;
+
+export const ReserveWithdrawReplySchema = Type.Object(
+  {
+    signature: Type.String()
+  },
+  { $id: 'ReserveWithdrawReply' },
+);
+
+export type ReserveWithdrawReply = Static<typeof ReserveWithdrawReplySchema>;
