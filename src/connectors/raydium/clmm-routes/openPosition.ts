@@ -73,12 +73,12 @@ async function openPosition(
       poolKeys,
       tickUpper: Math.max(lowerTick, upperTick),
       tickLower: Math.min(lowerTick, upperTick),
-      base: quotePositionResponse.inputBase ? 'MintA' : 'MintB',
+      base: quotePositionResponse.baseLimited ? 'MintA' : 'MintB',
       ownerInfo: {
         useSOLBalance: true,
       },
-      baseAmount: quotePositionResponse.inputBase ? new BN(quotePositionResponse.baseTokenAmount * (10 ** baseToken.decimals)) : new BN(quotePositionResponse.quoteTokenAmount * (10 ** quoteToken.decimals)),
-      otherAmountMax: quotePositionResponse.inputBase ? new BN(quotePositionResponse.quoteTokenAmountMax * (10 ** quoteToken.decimals)) : new BN(quotePositionResponse.baseTokenAmountMax * (10 ** baseToken.decimals)),
+      baseAmount: quotePositionResponse.baseLimited ? new BN(quotePositionResponse.baseTokenAmount * (10 ** baseToken.decimals)) : new BN(quotePositionResponse.quoteTokenAmount * (10 ** quoteToken.decimals)),
+      otherAmountMax: quotePositionResponse.baseLimited ? new BN(quotePositionResponse.quoteTokenAmountMax * (10 ** quoteToken.decimals)) : new BN(quotePositionResponse.baseTokenAmountMax * (10 ** baseToken.decimals)),
       txVersion: TxVersion.V0,
       computeBudgetConfig: {
         units: COMPUTE_UNITS,
@@ -151,6 +151,8 @@ export const openPositionRoute: FastifyPluginAsync = async (fastify) => {
             upperPrice: { type: 'number', examples: [1] },
             poolAddress: { type: 'string', examples: ['BqBMwCcPXu6ZMKQBX2hYGGN4PNkEb15vLjigt8DKtuLp'] },
             slippagePct: { type: 'number', examples: [1] },
+            baseTokenAmount: { type: 'number', examples: [2] },
+            quoteTokenAmount: { type: 'number', examples: [10] },
           }
         },
         response: {
