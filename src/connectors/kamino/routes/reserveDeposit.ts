@@ -102,13 +102,13 @@ export const reserveDepositRoute: FastifyPluginAsync = async (fastify) => {
           .mul(reserve.getMintFactor())
           .toString();
 
-          const depositAction = await KaminoAction.buildDepositTxns(
-            market,
-            amount,
-            tokenPubkey,
-            walletPubkey,
-            obligation
-          );
+        const depositAction = await KaminoAction.buildDepositTxns(
+          market,
+          amount,
+          tokenPubkey,
+          walletPubkey,
+          obligation
+        );
 
         const priorityFeePerComputeUnit = await solana.estimatePriorityFees();
         const defaultComputeUnits = solana.config.defaultComputeUnits;
@@ -121,7 +121,7 @@ export const reserveDepositRoute: FastifyPluginAsync = async (fastify) => {
           priorityFee,
         );
 
-        const repayIxs = [
+        const depositIxs = [
           ...computeIxs,
           ...depositAction.setupIxs,
           ...depositAction.lendingIxs,
@@ -132,7 +132,7 @@ export const reserveDepositRoute: FastifyPluginAsync = async (fastify) => {
           const signature = await buildAndSendTxn(
             connection,
             wallet,
-            repayIxs,
+            depositIxs,
             [],
           );
           return { signature };
@@ -140,7 +140,7 @@ export const reserveDepositRoute: FastifyPluginAsync = async (fastify) => {
           throw new Error('Transaction failed');
         }
       } catch (error) {
-        logger.error('\nFailed to deposit from Kamino market reserve:', error);
+        logger.error('\nFailed to deposit to Kamino market reserve:', error);
         if (error.statusCode) {
           throw fastify.httpErrors.createError(error.statusCode, 'Request failed');
         }
