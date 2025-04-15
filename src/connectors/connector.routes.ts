@@ -3,6 +3,7 @@ import { Type, Static } from '@sinclair/typebox';
 import { UniswapConfig } from './uniswap/uniswap.config';
 import { JupiterConfig } from './jupiter/jupiter.config';
 import { MeteoraConfig } from './meteora/meteora.config';
+import { RaydiumConfig } from './raydium/raydium.config';
 import { KaminoConfig } from './kamino/kamino.config';
 import { logger } from '../services/logger';
 
@@ -57,10 +58,15 @@ export const connectorsRoutes: FastifyPluginAsync = async (fastify) => {
           available_networks: MeteoraConfig.config.availableNetworks,
         },
         {
+          name: 'raydium',
+          trading_type: RaydiumConfig.config.tradingTypes,
+          available_networks: RaydiumConfig.config.availableNetworks,
+        },
+        {
           name: 'kamino',
           trading_type: KaminoConfig.config.tradingTypes,
           available_networks: KaminoConfig.config.availableNetworks,
-        },
+        }
       ];
 
       logger.info('Available connectors: ' + connectors.map(c => c.name).join(', '));

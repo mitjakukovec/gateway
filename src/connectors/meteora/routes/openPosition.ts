@@ -68,7 +68,7 @@ async function openPosition(
   }
 
   // Check balances with SOL buffer
-  const balances = await solana.getBalance(wallet);
+  const balances = await solana.getBalance(wallet, [tokenXSymbol, tokenYSymbol, "SOL"]);
   const requiredBaseAmount = (baseTokenAmount || 0) + 
     (tokenXSymbol === 'SOL' ? SOL_POSITION_RENT + SOL_TRANSACTION_BUFFER : 0);
   const requiredQuoteAmount = (quoteTokenAmount || 0) + 
@@ -221,9 +221,11 @@ export const openPositionRoute: FastifyPluginAsync = async (fastify) => {
           properties: {
             ...OpenPositionRequest.properties,
             network: { type: 'string', default: 'mainnet-beta' },
-            lowerPrice: { type: 'number', examples: [0.05] },
-            upperPrice: { type: 'number', examples: [0.15] },
-            poolAddress: { type: 'string', examples: ['FtFUzuXbbw6oBbU53SDUGspEka1D5Xyc4cwnkxer6xKz'] },
+            lowerPrice: { type: 'number', examples: [100] },
+            upperPrice: { type: 'number', examples: [180] },
+            poolAddress: { type: 'string', examples: ['2sf5NYcY4zUPXUSmG6f66mskb24t5F8S11pC1Nz5nQT3'] },
+            baseTokenAmount: { type: 'number', examples: [0.1] },
+            quoteTokenAmount: { type: 'number', examples: [15] },
             slippagePct: { type: 'number', examples: [1] },
             strategyType: { 
               type: 'number', 
